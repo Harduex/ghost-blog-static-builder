@@ -9,19 +9,13 @@ const DEPLOY_URL = process.env.DEPLOY_URL;
 const GHOST_URL = process.env.GHOST_URL || 'http://localhost:2368';
 const DIST_DIR = './dist';
 
-// Validation
 if (!DEPLOY_URL) {
     console.error('❌ ERROR: DEPLOY_URL is missing in the .env file!');
     process.exit(1);
 }
 
-/**
- * Helper to run shell commands.
- * Use ignoreErrors=true for commands that might return non-zero exit codes (like wget with 404s).
- */
 const runCommand = (command, ignoreErrors = false) => {
     try {
-        // Using 'pipe' to prevent console spam during loops, unless it's a main command
         execSync(command, { stdio: 'inherit' });
     } catch (e) {
         if (!ignoreErrors) {
@@ -31,9 +25,6 @@ const runCommand = (command, ignoreErrors = false) => {
     }
 };
 
-/**
- * Recursive file walker to find all files in a directory.
- */
 const getAllFiles = function(dirPath, arrayOfFiles) {
     const files = fs.readdirSync(dirPath);
     arrayOfFiles = arrayOfFiles || [];
@@ -48,84 +39,100 @@ const getAllFiles = function(dirPath, arrayOfFiles) {
 };
 
 (async () => {
-    // Dynamic import for ES Module compatibility
     const { replaceInFile } = await import('replace-in-file');
 
-    console.log(`🚀 Starting AUTONOMOUS build for: ${DEPLOY_URL}`);
+    console.log(`🚀 Starting ROBUST AUTONOMOUS build for: ${DEPLOY_URL}`);
     
-    // 1. Clean output directory
+    // 1. Clean
     console.log('🧹 Cleaning ./dist directory...');
     fs.emptyDirSync(DIST_DIR);
 
-    // 2. Main Download (Core HTML/CSS/JS structure)
+    // 2. Main Download
     console.log('📥 Downloading core content...');
     try {
-        // -m: mirror (suitable for static sites)
-        // -nH: no-host-directories
-        // -E: adjust-extension (converts clean URLs to .html)
-        // -p: page-requisites (css/js/images)
-        // -np: no-parent
         execSync(`wget -m -nH -P ${DIST_DIR} -E -p -np -e robots=off --restrict-file-names=windows ${GHOST_URL}`, { stdio: 'inherit' });
     } catch (e) {
-        console.warn('⚠️ Main wget finished with warnings (common for dynamic sites). Continuing...');
+        console.warn('⚠️ Main wget finished with warnings. Continuing...');
     }
 
-    // 3. Fetch Extra Pages (404 and RSS)
+    // 3. Extra Pages
     console.log('🔍 Fetching special pages (404, RSS)...');
     runCommand(`wget -q -nH -P ${DIST_DIR} -E -p --restrict-file-names=windows ${GHOST_URL}/404/`, true);
     runCommand(`wget -q -nH -P ${DIST_DIR} -E -p --restrict-file-names=windows ${GHOST_URL}/rss/`, true);
 
-    // 4. SMART IMAGE SCRAPER
-    // Scans downloaded HTML for images missed by wget (due to lazy-loading or srcset)
-    console.log('🕷️ Scraping missing images (checking for lazy-loaded assets)...');
+    // 4. ADVANCED IMAGE SCRAPER (Fixes missing srcset images)
+    console.log('🕷️ Scraping ALL images (src + srcset)...');
     
     const htmlFiles = getAllFiles(DIST_DIR).filter(file => file.endsWith('.html'));
     const foundImages = new Set();
     
-    // Regex to find Ghost image paths (e.g., /content/images/...)
-    const imageRegex = /\/content\/images\/[^"'\s),]+/g;
+    // Regex to find src="..." and srcset="..." containing /content/images/
+    // This is safer than raw matching
+    const attributeRegex = /(?:src|srcset)=["']([^"']+)["']/g;
 
-    // 4.1 Collect all image links from HTML files
     htmlFiles.forEach(file => {
         const content = fs.readFileSync(file, 'utf8');
-        const matches = content.match(imageRegex);
-        if (matches) {
-            matches.forEach(img => {
-                // Clean potential query parameters
-                let cleanUrl = img.split('?')[0]; 
-                foundImages.add(cleanUrl);
+        let match;
+        while ((match = attributeRegex.exec(content)) !== null) {
+            const rawValue = match[1]; // The content inside "..."
+            
+            // If it's a srcset, it looks like: "/path/img.png 600w, /path/img2.png 1000w"
+            // We need to split by comma
+            const candidates = rawValue.split(',');
+
+            candidates.forEach(candidate => {
+                // Take the first part (the URL), ignore the width (600w)
+                let cleanUrl = candidate.trim().split(/\s+/)[0];
+                
+                // Only care if it looks like a Ghost image
+                if (cleanUrl.includes('/content/images/')) {
+                     // Clean query strings (?v=...)
+                    cleanUrl = cleanUrl.split('?')[0];
+                    // Decode URI (fix %20 spaces)
+                    cleanUrl = decodeURIComponent(cleanUrl);
+                    foundImages.add(cleanUrl);
+                }
             });
         }
     });
 
     // 4.2 Download missing images
     let downloadedCount = 0;
-    console.log(`🔎 Found ${foundImages.size} potential image references. Verifying...`);
+    let failedCount = 0;
+    console.log(`🔎 Found ${foundImages.size} potential unique image references. Checking disk...`);
 
     for (const imgPath of foundImages) {
+        // imgPath is e.g. /content/images/size/w600/2025/12/img.png
+        
+        // Remove domain if it crept in (replace localhost or prod domain)
+        let relativePath = imgPath.replace(/^https?:\/\/[^\/]+/, '');
+        
         // Construct local path: dist/content/images/...
-        const localFile = path.join(DIST_DIR, imgPath); 
+        const localFile = path.join(DIST_DIR, relativePath); 
         
         if (!fs.existsSync(localFile)) {
-            const fullUrl = `${GHOST_URL}${imgPath}`;
+            const fullUrl = `${GHOST_URL}${relativePath}`;
             const targetDir = path.dirname(localFile);
             
             fs.ensureDirSync(targetDir);
             
             try {
-                // Quiet download for specific asset
+                // Try to download
                 execSync(`wget -q -O "${localFile}" "${fullUrl}"`);
-                process.stdout.write('.'); // Progress indicator
+                process.stdout.write('.'); 
                 downloadedCount++;
             } catch (e) {
-                // Ignore 404s for specific images
+                // If 404, Ghost fails to generate the size on the fly via wget sometimes
+                process.stdout.write('x');
+                failedCount++;
+                // console.log(`\n❌ Failed to dl: ${fullUrl}`); // Uncomment to debug
             }
         }
     }
-    console.log(`\n✅ Downloaded ${downloadedCount} missing assets.`);
+    console.log(`\n✅ Downloaded ${downloadedCount} new assets.`);
+    if (failedCount > 0) console.warn(`⚠️ Failed to download ${failedCount} assets (likely 404s from Ghost).`);
 
     // 5. SANITIZE FILENAMES
-    // Removes query strings like ?v=123 causing issues on GitHub Pages
     console.log('✨ Sanitizing filenames...');
     const allFiles = getAllFiles(DIST_DIR);
     allFiles.forEach(filePath => {
@@ -142,7 +149,7 @@ const getAllFiles = function(dirPath, arrayOfFiles) {
     // 6. FIXES & CLEANUP
     console.log('🔄 Rewriting URLs and cleaning HTML...');
 
-    // 6.1 Move 404 page to root
+    // 404 Fix
     const fourOhFourSrc = path.join(DIST_DIR, '404', 'index.html');
     const fourOhFourDest = path.join(DIST_DIR, '404.html');
     if (fs.existsSync(fourOhFourSrc)) {
@@ -150,38 +157,45 @@ const getAllFiles = function(dirPath, arrayOfFiles) {
         fs.removeSync(path.join(DIST_DIR, '404'));
     }
 
-    // 6.2 Replace Localhost with Production URL
+    // URL Rewrite
     await replaceInFile({
         files: `${DIST_DIR}/**/*.html`,
         from: new RegExp(GHOST_URL, 'g'),
         to: DEPLOY_URL,
     });
 
-    // 6.3 Remove version parameters from HTML references (href="style.css?v=...")
+    // Clean Versions
     await replaceInFile({
         files: `${DIST_DIR}/**/*.html`,
         from: /((?:\.css|\.js|\.png|\.jpg|\.jpeg|\.gif|\.svg|\.webp))([?@][^"'\s>]*)/g,
         to: '$1',
     });
 
-    // 6.4 Remove Ghost Portal script (dynamic membership features don't work on static)
+    // Remove Portal
     await replaceInFile({
         files: `${DIST_DIR}/**/*.html`,
         from: /<script.*ghost-portal.*><\/script>/g,
         to: '',
     });
 
-    // 6.5 Fix Sitemap extension
+    // Sitemap Fix
     const sitemapWrong = path.join(DIST_DIR, 'sitemap.xml.html');
     const sitemapRight = path.join(DIST_DIR, 'sitemap.xml');
     if (fs.existsSync(sitemapWrong)) fs.moveSync(sitemapWrong, sitemapRight, { overwrite: true });
 
-    // 7. CNAME & DEPLOY
+    // 7. Deploy
     const domain = DEPLOY_URL.replace(/^https?:\/\//, '');
     fs.writeFileSync(path.join(DIST_DIR, 'CNAME'), domain);
+    
+    // Create .nojekyll to disable Jekyll processing
+    fs.writeFileSync(path.join(DIST_DIR, '.nojekyll'), '');
+    
+    // Create a minimal .gitignore for the gh-pages branch (don't ignore content!)
+    fs.writeFileSync(path.join(DIST_DIR, '.gitignore'), 'node_modules/\n');
 
     console.log('📤 Pushing to GitHub...');
-    runCommand('npx gh-pages -d dist', true);
+    // Use --no-gitignore flag to deploy content folder despite .gitignore
+    runCommand('npx gh-pages -d dist --add -t', true);
 
     console.log('🎉 DEPLOYMENT COMPLETE!');
 })();
