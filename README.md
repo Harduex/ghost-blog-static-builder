@@ -71,6 +71,48 @@ npm run stop    # Stop all containers
 npm run deploy  # Build static site and push to GitHub Pages
 ```
 
+## Migrating an Existing Ghost Instance
+
+If you have an existing Ghost blog, you can migrate it to this setup:
+
+### 1. Export from Existing Ghost
+
+1. Log into your existing Ghost admin panel (`/ghost`)
+2. Navigate to **Settings → Advanced → Import/Export**
+3. Click **Export your content** and download the JSON file
+
+### 2. Copy Content Directory
+
+Copy your existing Ghost content directory to preserve images, themes, and files:
+
+```bash
+# From your existing Ghost installation
+cp -r /path/to/existing/ghost/content/* ./ghost/content/
+```
+
+This preserves:
+- Images (`content/images/`)
+- Themes (`content/themes/`)
+- Custom files (`content/files/`)
+- Media uploads (`content/media/`)
+
+### 3. Import into New Instance
+
+1. Start the local Ghost instance: `npm run start`
+2. Access Ghost admin at `http://localhost:2368/ghost`
+3. Complete the initial setup if it's a fresh installation
+4. Navigate to **Settings → Advanced → Import/Export**
+5. Under **Import**, click **Universal Import**
+6. Upload the exported JSON file from step 1
+7. Click **Import** to restore all posts, pages, tags, and settings
+
+### 4. Verify Migration
+
+- Check that all posts and pages appear correctly
+- Verify images are loading (they should reference the copied content directory)
+- Review theme settings and customizations
+- Test internal links and navigation
+
 ## Data Persistence
 
 All data persists in local volumes:
