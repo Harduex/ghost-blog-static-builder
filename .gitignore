@@ -9,3 +9,6 @@ dist/
 
 # Env
 .env
+
+# Other
+.fuse_hidden*
