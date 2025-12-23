@@ -5,8 +5,8 @@ services:
     ports:
       - "2368:2368"
     volumes:
-      # Maps local folder ./content to the container.
-      - ./content:/var/lib/ghost/content
+      # Maps local folder ./ghost/content to the container.
+      - ./ghost/content:/var/lib/ghost/content
     environment:
       # Ghost Configuration
       url: ${GHOST_URL}
@@ -35,7 +35,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       # Local folder to persist DB data
-      - ./mysql-data:/var/lib/mysql
+      - ./ghost/mysql-data:/var/lib/mysql
     # Healthcheck ensures the DB is ready before Ghost tries to connect
     healthcheck:
       test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]

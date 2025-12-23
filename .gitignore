@@ -3,9 +3,8 @@ node_modules/
 npm-debug.log
 
 # Docker & Data
-/content/
-/mysql-data/
-dist/
+ghost
+dist
 
 # Env
 .env
