@@ -60,9 +60,39 @@ const getFiles = (dir, ext) => {
     // Main Mirror (ignoreErrors=true to prevent crash on minor asset 404s)
     shell(`${CONFIG.wgetBase} -P ${CONFIG.distDir} -m ${CONFIG.ghostUrl}`, true);
     
-    // 2. Extra Pages (Best effort)
+    // 2. Extra Pages & Sitemaps (Best effort)
     shell(`${CONFIG.wgetBase} -P ${CONFIG.distDir} ${CONFIG.ghostUrl}/404/`, true);
     shell(`${CONFIG.wgetBase} -P ${CONFIG.distDir} ${CONFIG.ghostUrl}/rss/`, true);
+    
+    // 2a. Fetch Ghost Sitemaps
+    console.log('🗺️  Downloading sitemaps...');
+    const sitemaps = [
+        'sitemap.xml',
+        'sitemap-pages.xml',
+        'sitemap-posts.xml',
+        'sitemap-authors.xml',
+        'sitemap-tags.xml'
+    ];
+    
+    let sitemapCount = 0;
+    for (const sitemap of sitemaps) {
+        const destPath = path.join(CONFIG.distDir, sitemap);
+        try {
+            execSync(`wget -q -O "${destPath}" "${CONFIG.ghostUrl}/${sitemap}"`, { stdio: 'pipe' });
+            // Verify file has content (Ghost returns empty/error pages for missing sitemaps)
+            const stat = fs.statSync(destPath);
+            if (stat.size > 0) {
+                sitemapCount++;
+                process.stdout.write('.');
+            } else {
+                fs.removeSync(destPath);
+            }
+        } catch (e) {
+            // Ignore errors - sitemap might not exist
+            if (fs.existsSync(destPath)) fs.removeSync(destPath);
+        }
+    }
+    console.log(sitemapCount > 0 ? `\n✅ Downloaded ${sitemapCount} sitemaps.` : '\n⚠️  No sitemaps found.');
 
     // 3. Asset Scraper (Fix missing Ghost images)
     console.log('🕷️  Auditing & Fetching missing assets...');
@@ -114,10 +144,9 @@ const getFiles = (dir, ext) => {
         }
     });
 
-    // 4b. Structural Fixes (404 & Sitemap)
+    // 4b. Structural Fixes (404)
     const moves = [
-        { src: '404/index.html', dest: '404.html' },
-        { src: 'sitemap.xml.html', dest: 'sitemap.xml' }
+        { src: '404/index.html', dest: '404.html' }
     ];
 
     moves.forEach(({ src, dest }) => {
@@ -129,7 +158,7 @@ const getFiles = (dir, ext) => {
     });
 
     // 5. Content Replacements (Domain & Cleanup)
-    console.log('🔄 Rewriting HTML content...');
+    console.log('🔄 Rewriting HTML & sitemap content...');
     await replaceInFile({
         files: `${CONFIG.distDir}/**/*.html`,
         from: [
@@ -138,6 +167,23 @@ const getFiles = (dir, ext) => {
             /<script.*ghost-portal.*><\/script>/g // Remove Ghost Portal
         ],
         to: [CONFIG.deployUrl, '$1', ''],
+    });
+    
+    // 5a. Fix sitemap URLs (including stylesheet references)
+    const ghostDomain = CONFIG.ghostUrl.replace(/^https?:\/\//, '');
+    const deployDomain = CONFIG.deployUrl.replace(/^https?:\/\//, '');
+    await replaceInFile({
+        files: `${CONFIG.distDir}/**/*.xml`,
+        from: [
+            new RegExp(CONFIG.ghostUrl, 'g'),
+            new RegExp(`//${ghostDomain}`, 'g'),
+            /<\?xml-stylesheet[^?]*\?>/g  // Remove XSL stylesheet reference
+        ],
+        to: [
+            CONFIG.deployUrl,
+            `//${deployDomain}`,
+            ''
+        ],
     });
 
     // 6. Deploy Preparation
