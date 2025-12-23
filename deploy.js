@@ -189,9 +189,6 @@ const getAllFiles = function(dirPath, arrayOfFiles) {
     
     // Create .nojekyll to disable Jekyll processing
     fs.writeFileSync(path.join(DIST_DIR, '.nojekyll'), '');
-    
-    // Create a minimal .gitignore for the gh-pages branch (don't ignore content!)
-    fs.writeFileSync(path.join(DIST_DIR, '.gitignore'), 'node_modules/\n');
 
     console.log('📤 Pushing to GitHub...');
     // Use --no-gitignore flag to deploy content folder despite .gitignore
