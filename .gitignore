@@ -1,2 +1,1 @@
-# Allow everything in this deploy
-!*
+node_modules/
