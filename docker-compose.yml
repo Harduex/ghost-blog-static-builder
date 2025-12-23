@@ -16,7 +16,7 @@ services:
       database__client: mysql
       database__connection__host: database
       database__connection__port: 3306
-      database__connection__user: ${DB_USER}       # Using specific user, not root
+      database__connection__user: ${DB_USER}
       database__connection__password: ${DB_PASSWORD}
       database__connection__database: ${DB_NAME}
     depends_on:
