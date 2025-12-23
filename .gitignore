@@ -1,1 +1,13 @@
+# Node
 node_modules/
+npm-debug.log
+
+# Docker & Data
+ghost/
+dist/
+
+# Env
+.env
+
+# Other
+.fuse_hidden*
