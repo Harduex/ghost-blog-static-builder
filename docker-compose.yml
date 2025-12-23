@@ -1,0 +1,46 @@
+services:
+  blog:
+    image: ghost:5-alpine
+    restart: unless-stopped
+    ports:
+      - "2368:2368"
+    volumes:
+      # Maps local folder ./content to the container.
+      - ./content:/var/lib/ghost/content
+    environment:
+      # Ghost Configuration
+      url: ${GHOST_URL}
+      NODE_ENV: production
+      
+      # Database Configuration
+      database__client: mysql
+      database__connection__host: database
+      database__connection__port: 3306
+      database__connection__user: ${DB_USER}       # Using specific user, not root
+      database__connection__password: ${DB_PASSWORD}
+      database__connection__database: ${DB_NAME}
+    depends_on:
+      database:
+        condition: service_healthy
+
+  database:
+    image: mysql:8.0
+    restart: unless-stopped
+    cap_add:
+      - SYS_NICE  # Suppresses mbind: Operation not permitted warnings
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      # Local folder to persist DB data
+      - ./mysql-data:/var/lib/mysql
+    # Healthcheck ensures the DB is ready before Ghost tries to connect
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    # Only expose this port if you need to connect via a tool like DBeaver/TablePlus
+    # ports:
+    #   - "13928:3306"
