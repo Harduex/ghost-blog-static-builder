@@ -9,12 +9,31 @@ const CONFIG = {
     deployUrl: process.env.DEPLOY_URL,
     ghostUrl: process.env.GHOST_URL || 'http://localhost:2368',
     distDir: path.resolve(__dirname, 'dist'),
+    buildOnly: process.env.BUILD_ONLY === 'true',
     // -nv: non-verbose (shows errors/summary, hides progress bars)
     wgetBase: `wget -nv -nH -E -p -np -e robots=off --restrict-file-names=windows`
 };
 
+// --- HTML Cleanup Configuration ---
+// Selectors support simple classes/ids and complex CSS selectors with escaped characters
+const elementsToRemove = [
+    // Subscribe form in the header follow dropdown
+    'body > div.site-wrapper.flex.flex-col.justify-start.min-h-screen > header > div > ul > li.dropdown.is-right.is-hoverable.hidden.relative.lg\\:block > div > div > div',
+    // Login button
+    'body > div.site-wrapper.flex.flex-col.justify-start.min-h-screen > header > div > ul > li.header-dropdown-menu.dropdown.is-right.is-hoverable.h-16.hidden.lg\\:flex.items-center.cursor-pointer',
+    // Search button
+    'body > div.site-wrapper.flex.flex-col.justify-start.min-h-screen > header > div > ul > li.js-toggle-search.hla.h-16.cursor-pointer.flex.items-center.px-2',
+    // Newsletter subscribe box in sidebar
+    'body > div.site-wrapper.flex.flex-col.justify-start.min-h-screen > main > div > aside > div.sidebar-subscribe.mb-8.text-center.shadow-lg.p-6.bg-primary.rounded-2xl',
+    'body > div.site-wrapper.flex.flex-col.justify-start.min-h-screen > main > div.container.mx-auto.my-10 > div > aside > div.sidebar-subscribe.mb-8.text-center.shadow-lg.p-6.bg-primary.rounded-2xl',
+    // Mobile login elements
+    'body > div.site-wrapper.flex.flex-col.justify-start.min-h-screen > div > div.mobile-menu.w-full.fixed.inset-0.bg-blank.min-h-screen.left-auto.z-50.overflow-y-auto.overflow-x-hidden.md\\:max-w-sm > div > nav.flex.px-4.justify-around',
+    'body > div.site-wrapper.flex.flex-col.justify-start.min-h-screen > div > div.mobile-menu.w-full.fixed.inset-0.bg-blank.min-h-screen.left-auto.z-50.overflow-y-auto.overflow-x-hidden.md\\:max-w-sm > div > hr:nth-child(4)',
+
+];
+
 // --- Validation ---
-if (!CONFIG.deployUrl) {
+if (!CONFIG.buildOnly && !CONFIG.deployUrl) {
     console.error('❌ Error: DEPLOY_URL is missing in .env file.');
     process.exit(1);
 }
@@ -45,13 +64,33 @@ const getFiles = (dir, ext) => {
     return results;
 };
 
+// --- HTML Cleanup Function ---
+const cleanHtml = (cheerio, htmlContent) => {
+    const $ = cheerio.load(htmlContent);
+    
+    elementsToRemove.forEach(selector => {
+        try {
+            const $elements = $(selector);
+            if ($elements.length > 0) {
+                $elements.remove();
+            }
+        } catch (e) {
+            console.warn(`⚠️ Invalid selector: "${selector}" - ${e.message}`);
+        }
+    });
+    
+    return $.html();
+};
+
 // --- Main Execution ---
 (async () => {
-    // Dynamic import for ESM package
+    // Dynamic import for ESM packages
     const { replaceInFile } = await import('replace-in-file');
+    const cheerio = await import('cheerio');
     const timerStart = Date.now();
     
-    console.log(`🚀 Starting Production Build for: ${CONFIG.deployUrl}`);
+    const buildMode = CONFIG.buildOnly ? 'Build Only' : `Production Build for: ${CONFIG.deployUrl}`;
+    console.log(`🚀 Starting ${buildMode}`);
 
     // 1. Clean & Mirror
     console.log('🧹 Cleaning dist & Downloading Content...');
@@ -186,15 +225,31 @@ const getFiles = (dir, ext) => {
         ],
     });
 
-    // 6. Deploy Preparation
-    console.log('📦 Finalizing for GitHub Pages...');
-    const domain = CONFIG.deployUrl.replace(/^https?:\/\//, '');
-    fs.writeFileSync(path.join(CONFIG.distDir, 'CNAME'), domain);
-    fs.writeFileSync(path.join(CONFIG.distDir, '.nojekyll'), '');
+    // 5b. HTML Element Cleanup
+    console.log('🧽 Cleaning HTML elements...');
+    const htmlFilesToClean = getFiles(CONFIG.distDir, '.html');
+    htmlFilesToClean.forEach(file => {
+        const htmlContent = fs.readFileSync(file, 'utf8');
+        const cleanedHtml = cleanHtml(cheerio, htmlContent);
+        fs.writeFileSync(file, cleanedHtml, 'utf8');
+        process.stdout.write('.');
+    });
+    console.log(`\n✅ Cleaned ${htmlFilesToClean.length} HTML files.`);
 
-    // 7. Push
-    console.log('📤 Deploying to GitHub...');
-    shell('npx gh-pages -d dist --add -t --dotfiles', true);
+    // 6. Deploy Preparation & Push
+    if (!CONFIG.buildOnly) {
+        console.log('📦 Finalizing for GitHub Pages...');
+        const domain = CONFIG.deployUrl.replace(/^https?:\/\//, '');
+        fs.writeFileSync(path.join(CONFIG.distDir, 'CNAME'), domain);
+        fs.writeFileSync(path.join(CONFIG.distDir, '.nojekyll'), '');
 
-    console.log(`🎉 DEPLOYMENT SUCCESSFUL! (${((Date.now() - timerStart)/1000).toFixed(2)}s)`);
+        // 7. Push
+        console.log('📤 Deploying to GitHub...');
+        shell('npx gh-pages -d dist --add -t --dotfiles', true);
+
+        console.log(`🎉 DEPLOYMENT SUCCESSFUL! (${((Date.now() - timerStart)/1000).toFixed(2)}s)`);
+    } else {
+        console.log(`🎉 BUILD COMPLETE! (${((Date.now() - timerStart)/1000).toFixed(2)}s)`);
+        console.log(`📁 Output directory: ${CONFIG.distDir}`);
+    }
 })();

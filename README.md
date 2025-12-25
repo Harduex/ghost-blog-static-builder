@@ -68,8 +68,67 @@ Environment variables in `.env`:
 ```bash
 npm run start   # Start Ghost + MySQL (detached)
 npm run stop    # Stop all containers
+npm run build   # Build static site (skips deployment)
+npm run preview # Build and preview locally at http://localhost:8080
 npm run deploy  # Build static site and push to GitHub Pages
 ```
+
+## HTML Element Cleanup
+
+The build pipeline can automatically remove unwanted HTML elements from your static output. This is useful for stripping:
+- Navigation elements that don't make sense in static builds
+- Dynamic features like signup forms or comments
+- Ghost-specific scripts and overlays
+- Custom UI elements you don't want in the static version
+
+### Configuration
+
+Edit the `elementsToRemove` array in `deploy.js`:
+
+```javascript
+const elementsToRemove = [
+    '.gh-head-actions',           // Simple class selector
+    '#ghost-portal-root',         // ID selector
+    '.subscribe-overlay',         // Another class
+    'div.modal.is-active',        // Combined selectors
+    'body > div > header > nav'    // Complex descendant selector
+];
+```
+
+### Finding CSS Selectors in Your Browser
+
+You don't need to write selectors manually. All modern browsers (Chrome, Firefox, Edge, Safari) have built-in tools to copy element selectors:
+
+#### Steps for Chrome/Edge/Firefox:
+
+1. **Right-click** on the element in the website you want to remove (e.g., a header, button, or overlay)
+2. Select **Inspect** (or "Inspect Element")
+3. The DevTools panel will open with the HTML code, and the element will be highlighted in blue
+4. **Right-click** on the highlighted HTML element in the DevTools panel
+5. Go to **Copy** → **Copy selector** (or "Copy CSS Selector" in some browsers)
+6. Paste the selector into the `elementsToRemove` array in `deploy.js`
+
+#### Example:
+
+If you want to remove a dropdown menu that appears on hover, you'd:
+1. Hover over the element and right-click it
+2. Select **Inspect** to open DevTools
+3. In the DevTools panel, **right-click** on the highlighted HTML element
+4. Select **Copy** → **Copy selector**
+5. Paste the selector into the `elementsToRemove` array in `deploy.js`:
+
+```javascript
+const elementsToRemove = [
+    'body > div.site-wrapper > header > div > ul > li.dropdown.is-right.is-hoverable.hidden.relative.lg\\:block > div > div > div'
+];
+```
+
+**Note on escaping:** If a selector contains special characters inside class names (e.g., Tailwind `lg:flex`), CSS requires escaping the colon as `\:`. Inside a JavaScript string you must escape that backslash, so write it as `lg\\:flex`.
+
+Example:
+
+- DevTools copies: `li.header-dropdown-menu.hidden.lg:flex.items-center`
+- In `elementsToRemove`: `'li.header-dropdown-menu.hidden.lg\\:flex.items-center'`
 
 ## Migrating an Existing Ghost Instance
 

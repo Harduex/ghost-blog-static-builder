@@ -5,6 +5,8 @@
   "scripts": {
     "start": "docker compose up -d",
     "stop": "docker compose down",
+    "build": "BUILD_ONLY=true node deploy.js",
+    "preview": "npm run build && npx http-server dist -p 8080 -o",
     "deploy": "node deploy.js"
   },
   "keywords": [],
@@ -16,5 +18,8 @@
     "fs-extra": "^11.3.3",
     "gh-pages": "^6.3.0",
     "replace-in-file": "^8.4.0"
+  },
+  "dependencies": {
+    "cheerio": "^1.1.2"
   }
 }
