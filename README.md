@@ -24,6 +24,7 @@ cp .env.example .env
 npm run start
 
 # 3. Create content at http://localhost:2368/ghost
+# Mailpit UI (caught emails): http://localhost:8025
 
 # 4. Deploy to production
 npm run deploy
@@ -35,8 +36,9 @@ npm run deploy
 ┌─────────────┐      ┌──────────────┐      ┌────────────────┐
 │   Ghost     │─────▶│  deploy.js   │─────▶│ GitHub Pages   │
 │  + MySQL    │      │  (Builder)   │      │  (Static CDN)  │
-└─────────────┘      └──────────────┘      └────────────────┘
-   Docker              Node Pipeline          gh-pages branch
+│  + Mailpit  │      └──────────────┘      └────────────────┘
+└─────────────┘        Node Pipeline          gh-pages branch
+   Docker
 ```
 
 ### Components
@@ -46,6 +48,9 @@ Production Ghost instance with persistent content and database volumes.
 
 **MySQL Container** (`mysql:8.0`)  
 Relational database with health checks and automatic retries.
+
+**Mailpit Container** (`axllent/mailpit`)  
+Local SMTP server that catches all outgoing emails. Web UI available at `http://localhost:8025`.
 
 **Build Pipeline** (`deploy.js`)  
 Orchestrates mirroring, asset auditing, content sanitization, and GitHub deployment.
