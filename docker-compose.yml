@@ -46,9 +46,8 @@ services:
       test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
       timeout: 20s
       retries: 10
-    # Only expose this port if you need to connect via a tool like DBeaver/TablePlus
-    # ports:
-    #   - "13928:3306"
+    ports:
+      - "13928:3306"
 
   mailpit:
     image: axllent/mailpit:latest

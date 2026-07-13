@@ -76,7 +76,19 @@ npm run stop    # Stop all containers
 npm run build   # Build static site (skips deployment)
 npm run preview # Build and preview locally at http://localhost:8080
 npm run deploy  # Build static site and push to GitHub Pages
+npm run export  # Export all published posts to individual markdown files
 ```
+
+## Markdown Export
+
+To export all published blog posts as individual Markdown (`.md`) files with YAML frontmatter to `./export/`:
+
+```bash
+npm run export
+```
+
+The script automatically pulls from the live MySQL database (if running) or falls back to the latest JSON backup in `./ghost/content/data/`.
+
 
 ## HTML Element Cleanup
 
