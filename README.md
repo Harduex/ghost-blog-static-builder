@@ -9,7 +9,7 @@ This toolchain runs a local Ghost instance with MySQL, generates a static snapsh
 ## Prerequisites
 
 - Docker & Docker Compose
-- Node.js (v16+)
+- Node.js (v22+, see `.nvmrc`)
 - `wget` (installed by default on most Unix systems)
 - Git repository configured with `gh-pages` branch
 
@@ -67,6 +67,7 @@ Environment variables in `.env`:
 | `DB_USER` | MySQL username | `ghost` |
 | `DB_PASSWORD` | MySQL user password | `ghostdbpass` |
 | `DB_ROOT_PASSWORD` | MySQL root password | `somesecretrootpass` |
+| `DB_PORT` | Host port for MySQL (used by `npm run export`) | `13928` |
 
 ## Commands
 

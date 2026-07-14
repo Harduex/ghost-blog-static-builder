@@ -1,7 +1,16 @@
 {
   "name": "ghost-blog-static-builder",
   "version": "1.0.0",
-  "main": "index.js",
+  "private": true,
+  "description": "A deployment pipeline for converting Ghost CMS into a static site hosted on GitHub Pages.",
+  "author": "Harduex",
+  "license": "ISC",
+  "keywords": [
+    "ghost",
+    "static-site",
+    "github-pages",
+    "blog"
+  ],
   "scripts": {
     "start": "docker compose up -d",
     "stop": "docker compose down",
@@ -10,11 +19,8 @@
     "deploy": "node deploy.js",
     "export": "node export-md.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "devDependencies": {
+  "dependencies": {
+    "cheerio": "^1.1.2",
     "dotenv": "^17.2.3",
     "fs-extra": "^11.3.3",
     "gh-pages": "^6.3.0",
@@ -22,8 +28,5 @@
     "replace-in-file": "^8.4.0",
     "turndown": "^7.2.4",
     "turndown-plugin-gfm": "^1.0.2"
-  },
-  "dependencies": {
-    "cheerio": "^1.1.2"
   }
 }

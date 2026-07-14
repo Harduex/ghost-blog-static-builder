@@ -39,6 +39,9 @@ if (!CONFIG.buildOnly && !CONFIG.deployUrl) {
 }
 
 // --- Helpers ---
+// Escape a string for safe use inside a RegExp (URLs may contain '.', etc.)
+const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const shell = (cmd, ignoreErrors = false) => {
     try {
         execSync(cmd, { stdio: 'inherit' });
@@ -201,9 +204,9 @@ const cleanHtml = (cheerio, htmlContent) => {
     await replaceInFile({
         files: `${CONFIG.distDir}/**/*.html`,
         from: [
-            new RegExp(CONFIG.ghostUrl, 'g'), // Swap Domain
+            new RegExp(escapeRegExp(CONFIG.ghostUrl), 'g'), // Swap Domain
             /((?:\.css|\.js|\.png|\.jpg|\.svg|\.webp))([?@][^"'\s>]*)/g, // Remove cache busters
-            /<script.*ghost-portal.*><\/script>/g // Remove Ghost Portal
+            /<script\b[^>]*ghost-portal[^>]*><\/script>/g // Remove Ghost Portal
         ],
         to: [CONFIG.deployUrl, '$1', ''],
     });
@@ -214,8 +217,8 @@ const cleanHtml = (cheerio, htmlContent) => {
     await replaceInFile({
         files: `${CONFIG.distDir}/**/*.xml`,
         from: [
-            new RegExp(CONFIG.ghostUrl, 'g'),
-            new RegExp(`//${ghostDomain}`, 'g'),
+            new RegExp(escapeRegExp(CONFIG.ghostUrl), 'g'),
+            new RegExp(escapeRegExp(`//${ghostDomain}`), 'g'),
             /<\?xml-stylesheet[^?]*\?>/g  // Remove XSL stylesheet reference
         ],
         to: [

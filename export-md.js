@@ -11,6 +11,13 @@ const CONFIG = {
     exportDir: path.resolve(__dirname, 'export'),
     ghostUrl: process.env.GHOST_URL || 'http://localhost:2368',
     deployUrl: process.env.DEPLOY_URL || '',
+    db: {
+        host: '127.0.0.1',
+        port: Number(process.env.DB_PORT) || 13928,
+        user: process.env.DB_USER || 'ghost',
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME || 'ghost',
+    },
 };
 
 // --- Turndown Setup ---
@@ -226,52 +233,29 @@ const generateFrontmatter = (post, tags, authors) => {
 
     let data = null;
     let dataSource = '';
-    let ghostVersion = 'unknown';
 
     // 1. Attempt to connect to live MySQL database
     console.log('🔍 Attempting connection to live MySQL database...');
     try {
         const mysql = require('mysql2/promise');
         const connection = await mysql.createConnection({
-            host: '127.0.0.1',
-            port: 13928,
-            user: CONFIG.dbUser || process.env.DB_USER || 'user',
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME || 'ghost',
-            connectTimeout: 2000 // 2 seconds timeout
+            ...CONFIG.db,
+            connectTimeout: 2000, // 2 seconds timeout
         });
 
         console.log('   🔌 Connected successfully to local MySQL database.');
-        
+
         // Fetch all required tables
         const [posts] = await connection.query('SELECT * FROM posts');
         const [tags] = await connection.query('SELECT * FROM tags');
         const [users] = await connection.query('SELECT * FROM users');
         const [posts_tags] = await connection.query('SELECT * FROM posts_tags');
         const [posts_authors] = await connection.query('SELECT * FROM posts_authors');
-        
+
         await connection.end();
 
         data = { posts, tags, users, posts_tags, posts_authors };
         dataSource = 'Live MySQL Database';
-        
-        // Try to fetch version from settings
-        try {
-            const tempConn = await mysql.createConnection({
-                host: '127.0.0.1',
-                port: 13928,
-                user: CONFIG.dbUser || process.env.DB_USER || 'user',
-                password: process.env.DB_PASSWORD,
-                database: process.env.DB_NAME || 'ghost',
-            });
-            const [settings] = await tempConn.query('SELECT value FROM settings WHERE `key` = "version"');
-            if (settings.length > 0) {
-                ghostVersion = settings[0].value;
-            }
-            await tempConn.end();
-        } catch (e) {
-            // Ignore version query errors
-        }
     } catch (dbError) {
         console.warn(`   ⚠️  Could not connect to live database (${dbError.message}).`);
         console.log('   🔄 Falling back to reading JSON export files from disk...');
@@ -288,12 +272,11 @@ const generateFrontmatter = (post, tags, authors) => {
         console.log(`   📄 Using export file: ${path.basename(exportFile)}`);
         const rawData = JSON.parse(fs.readFileSync(exportFile, 'utf8'));
         data = rawData.data;
-        ghostVersion = rawData.meta?.version || 'unknown';
         dataSource = `JSON Export File (${path.basename(exportFile)})`;
     }
 
     console.log(`   🌐 Source: ${dataSource}`);
-    console.log(`   Ghost v${ghostVersion} — ${data.posts.length} total entries found`);
+    console.log(`   ${data.posts.length} total entries found`);
 
     // 3. Build lookups
     const { postTags, postAuthors } = buildLookups(data);

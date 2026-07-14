@@ -47,7 +47,8 @@ services:
       timeout: 20s
       retries: 10
     ports:
-      - "13928:3306"
+      # Bind to loopback only — the DB is consumed by the host-side export script, not the LAN.
+      - "127.0.0.1:${DB_PORT:-13928}:3306"
 
   mailpit:
     image: axllent/mailpit:latest
