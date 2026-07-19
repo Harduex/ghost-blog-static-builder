@@ -116100,4 +116100,7 @@ a > code[class*=language-] {
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
+html.dark .hover\:text-primary:hover {
+  color: #ccc !important;
+}
 /*# sourceMappingURL=map/main.css.map */
