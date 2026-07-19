@@ -136,37 +136,42 @@ const cleanHtml = (cheerio, htmlContent) => {
     }
     console.log(sitemapCount > 0 ? `\n✅ Downloaded ${sitemapCount} sitemaps.` : '\n⚠️  No sitemaps found.');
 
-    // 3. Asset Scraper (Fix missing Ghost images)
+    // 3. Asset Scraper (Fix missing Ghost assets)
     console.log('🕷️  Auditing & Fetching missing assets...');
-    const htmlFiles = getFiles(CONFIG.distDir, '.html');
-    const foundImages = new Set();
-    const urlPattern = /(?:src|srcset)=["']([^"']+)["']/g;
+    const scanFiles = [...getFiles(CONFIG.distDir, '.html'), ...getFiles(CONFIG.distDir, '.js')];
+    const foundAssets = new Set();
+    
+    const srcPattern = /(?:src|srcset)=["']([^"']+)["']/g;
+    const genericPattern = /(?:'|")(\/(?:content\/images|assets)\/[^"']+)(?:'|")/g;
 
-    for (const file of htmlFiles) {
+    for (const file of scanFiles) {
         const content = fs.readFileSync(file, 'utf8');
-        const matches = [...content.matchAll(urlPattern)];
         
-        matches.forEach(match => {
-            // Handle src="..." and srcset="url 1x, url 2x"
+        const srcMatches = [...content.matchAll(srcPattern)];
+        srcMatches.forEach(match => {
             const urls = match[1].split(',').map(u => u.trim().split(/\s+/)[0]);
             urls.forEach(url => {
-                if (url.includes('/content/images/')) {
-                    // Normalize: decode URI and strip query params (?v=...)
-                    foundImages.add(decodeURIComponent(url.split(/[?#]/)[0]));
+                if (url.includes('/content/') || url.includes('/assets/')) {
+                    foundAssets.add(decodeURIComponent(url.split(/[?#]/)[0]));
                 }
             });
+        });
+        
+        const genericMatches = [...content.matchAll(genericPattern)];
+        genericMatches.forEach(match => {
+            foundAssets.add(decodeURIComponent(match[1].split(/[?#]/)[0]));
         });
     }
 
     let dlCount = 0;
-    for (const rawPath of foundImages) {
+    for (const rawPath of foundAssets) {
         const relativePath = rawPath.replace(/^https?:\/\/[^\/]+/, '');
-        const localDest = path.join(CONFIG.distDir, relativePath);
+        if (!relativePath.startsWith('/')) continue;
         
+        const localDest = path.join(CONFIG.distDir, relativePath);
         if (!fs.existsSync(localDest)) {
             fs.ensureDirSync(path.dirname(localDest));
             try {
-                // Fetch specific missing asset
                 execSync(`wget -q -O "${localDest}" "${CONFIG.ghostUrl}${relativePath}"`);
                 dlCount++;
                 process.stdout.write('.');
